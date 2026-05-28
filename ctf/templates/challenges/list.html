@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}{% if active_category_label %}{{ active_category_label }} — {% endif %}Challenges — {{ CTF_NAME }}{% endblock %}
+
+{% block content %}
+
+{% if not active_category %}
+<div class="challenge-header">
+  <div>
+    <h1>Categories</h1>
+    <p style="font-family:var(--mono);font-size:0.82rem;color:var(--text-dim);margin-top:0.3rem">choose your battlefield</p>
+  </div>
+  <div class="progress-summary">
+    <span class="ps-solved">{{ total_solved }}</span>
+    <span class="ps-sep">/</span>
+    <span class="ps-total">{{ total_challenges }}</span>
+    <span class="ps-label">solved</span>
+  </div>
+</div>
+
+<div class="cat-grid">
+  {% for cat_label, cat in all_categories.items %}
+  <a href="{% url 'challenges:list' %}?category={{ cat.key }}"
+     class="cat-card" style="--cc: {{ cat.color }}">
+    <div class="cc-glow"></div>
+    <div class="cc-top">
+      <span class="cc-dot" style="background: {{ cat.color }}"></span>
+      <span class="cc-progress">{{ cat.solved }}/{{ cat.total }}</span>
+    </div>
+    <span class="cc-icon">{{ cat.icon }}</span>
+    <div class="cc-name">{{ cat_label }}</div>
+    <div class="cc-desc">{{ cat.description }}</div>
+    <div class="cc-meta">
+      <span class="cc-count">{{ cat.total }} challenge{{ cat.total|pluralize }}</span>
+      <span class="cc-arrow">→</span>
+    </div>
+    <div class="cc-bar">
+      {% if cat.total > 0 %}
+        <div class="cc-bar-fill" style="height: {% widthratio cat.solved cat.total 100 %}%; background: {{ cat.color }}"></div>
+      {% endif %}
+    </div>
+  </a>
+  {% empty %}
+  <div class="empty-state">
+    <div class="empty-icon">_</div>
+    <p>no challenges active yet</p>
+    <p class="empty-sub">check back soon...</p>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+
+<div class="challenge-header">
+  <div class="ch-left">
+    <div class="ch-breadcrumb">
+      <a href="{% url 'challenges:list' %}" class="ch-back">← all categories</a>
+    </div>
+    <h1 style="color: {{ active_category_color }}">{{ active_category_label }}</h1>
+  </div>
+  <div class="progress-summary">
+    <span class="ps-solved">{{ total_solved }}</span>
+    <span class="ps-sep">/</span>
+    <span class="ps-total">{{ total_challenges }}</span>
+    <span class="ps-label">solved</span>
+  </div>
+</div>
+
+{% for cat_label, cat in categories.items %}
+<div class="challenges-grid">
+  {% for item in cat.challenges %}
+  <a href="{% url 'challenges:detail' item.obj.pk %}"
+     class="challenge-card {% if item.solved %}solved{% endif %}"
+     style="--card-color: {{ item.obj.color }}">
+    {% if item.solved %}<span class="solved-badge">✓ SOLVED</span>{% endif %}
+    <div class="card-cat-stripe" style="background: {{ item.obj.color }}"></div>
+    <div class="card-title">{{ item.obj.title }}</div>
+    <div class="card-meta">
+      <span class="card-pts">{{ item.obj.points }} pts</span>
+      <span class="card-diff diff-{{ item.obj.difficulty }}">{{ item.obj.difficulty }}</span>
+    </div>
+    <div class="card-solves">{{ item.obj.solves_count }} solve{{ item.obj.solves_count|pluralize }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% empty %}
+<div class="empty-state">
+  <div class="empty-icon">_</div>
+  <p>no challenges in this category yet</p>
+  <p class="empty-sub">check back soon...</p>
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}

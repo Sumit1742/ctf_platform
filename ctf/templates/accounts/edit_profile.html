@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Edit Profile — {{ CTF_NAME }}{% endblock %}
+
+{% block content %}
+<div class="auth-container" style="max-width:500px">
+  <div class="auth-title">// edit profile</div>
+  <div class="auth-card">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {% for field in form %}
+      <div class="form-group">
+        <label>{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}
+        <div class="form-errors">{{ field.errors|join:", " }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary" style="width:100%">save changes</button>
+    </form>
+    <div class="form-footer">
+      <a href="{% url 'accounts:profile' %}">cancel</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

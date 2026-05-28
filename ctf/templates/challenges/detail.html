@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% block title %}{{ challenge.title }} — {{ CTF_NAME }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:1.2rem">
+  <a href="{% url 'challenges:list' %}?category={{ challenge.category }}" class="ch-back">
+    ← back to {{ challenge.get_category_display }}
+  </a>
+</div>
+
+<div class="detail-layout">
+  <div class="detail-main">
+    <div class="detail-header">
+      <h1>{{ challenge.title }}</h1>
+      <div class="detail-tags">
+        <span class="tag tag-category"
+              style="color:{{ challenge.color }};background:{{ challenge.color }}18;border-color:{{ challenge.color }}44">
+          {{ challenge.get_category_display }}
+        </span>
+        <span class="tag tag-pts">{{ challenge.points }} pts</span>
+        <span class="tag card-diff diff-{{ challenge.difficulty }}">{{ challenge.difficulty }}</span>
+        <span class="tag tag-solves">{{ challenge.solves_count }} solve{{ challenge.solves_count|pluralize }}</span>
+      </div>
+    </div>
+
+    <div class="detail-description">{{ challenge.description }}</div>
+
+    {% if challenge.connection_info %}
+    <div class="connection-box">
+      <label>connection</label>
+      <code>{{ challenge.connection_info }}</code>
+    </div>
+    {% endif %}
+
+    {% if challenge.attached_files.exists %}
+    <div class="card mb-3">
+      <div class="section-title">files</div>
+      {% for f in challenge.attached_files.all %}
+      <div style="margin-bottom:0.5rem">
+        <a href="{{ f.file.url }}" class="btn btn-outline" style="font-size:0.85rem">↓ {{ f.display_name }}</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if first_blood %}
+    <div style="font-family:var(--mono);font-size:0.78rem;color:var(--text-muted);margin-bottom:1rem">
+      first blood: <span style="color:var(--red)">{{ first_blood.player.username }}</span>
+      &nbsp;·&nbsp; {{ first_blood.submitted_at|date:"M d, H:i" }}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="detail-sidebar">
+    {% if is_solved %}
+    <div class="solved-banner">
+      <div style="font-size:1.5rem;margin-bottom:0.5rem">✓</div>
+      <div style="letter-spacing:2px;font-family:var(--mono)">CHALLENGE SOLVED</div>
+      <div style="font-size:0.8rem;color:var(--green-dim);margin-top:0.3rem;font-family:var(--mono)">+{{ challenge.points }} points awarded</div>
+    </div>
+    {% else %}
+    <div class="submit-box">
+      <h3>Submit Flag</h3>
+      <form id="flag-form" data-url="{% url 'challenges:submit' challenge.pk %}">
+        {% csrf_token %}
+        <div class="flag-input-row">
+          <input type="text" id="flag-input" class="flag-input"
+                 placeholder="CTF{...}" autocomplete="off" spellcheck="false">
+          <button type="submit" id="flag-submit-btn" class="btn btn-primary">submit</button>
+        </div>
+      </form>
+      <div id="submit-result" class="submit-result"></div>
+      {% if challenge.max_attempts > 0 %}
+      <div style="margin-top:0.5rem;font-family:var(--mono);font-size:0.73rem;color:var(--text-muted)">
+        attempts: {{ attempts }} / {{ challenge.max_attempts }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if challenge.hints %}
+    <div class="hints-box">
+      <h3>Hints</h3>
+      {% for hint in challenge.hints %}
+      <div class="hint-item" id="hint-item-{{ forloop.counter0 }}">
+        <div class="hint-toggle" onclick="toggleHint({{ forloop.counter0 }})">
+          <span class="hint-arrow" id="hint-arrow-{{ forloop.counter0 }}">▶</span>
+          <span class="hint-label">hint #{{ forloop.counter }}</span>
+          {% if hint.cost %}<span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-muted);margin-left:auto">-{{ hint.cost }}pts</span>{% endif %}
+        </div>
+        <div class="hint-body" id="hint-body-{{ forloop.counter0 }}" style="max-height:0;opacity:0;overflow:hidden;transition:max-height 0.3s ease,opacity 0.3s ease;">
+          <div class="hint-text">{{ hint.text }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleHint(index) {
+  const body  = document.getElementById('hint-body-' + index);
+  const arrow = document.getElementById('hint-arrow-' + index);
+  const isOpen = body.style.maxHeight && body.style.maxHeight !== '0px';
+  body.style.maxHeight  = isOpen ? '0px'   : '300px';
+  body.style.opacity    = isOpen ? '0'     : '1';
+  arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+
+(function () {
+  const form = document.getElementById('flag-form');
+  if (!form) return;
+  const input     = document.getElementById('flag-input');
+  const resultBox = document.getElementById('submit-result');
+  const btn       = document.getElementById('flag-submit-btn');
+  const url       = form.dataset.url;
+  const csrf      = form.querySelector('[name=csrfmiddlewaretoken]').value;
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const flag = input.value.trim();
+    if (!flag) { showResult('error', '⚠ Flag cannot be empty.'); return; }
+    btn.disabled = true; btn.textContent = 'checking…';
+    resultBox.className = 'submit-result'; resultBox.textContent = '';
+
+    try {
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf }, body: JSON.stringify({ flag }) });
+      const data = await res.json();
+      switch (data.status) {
+        case 'correct':
+          showResult('correct', '✔ ' + data.message);
+          input.disabled = true; btn.disabled = true; btn.textContent = 'solved';
+          setTimeout(() => location.reload(), 1800); break;
+        case 'wrong':
+          showResult('wrong', '✘ ' + data.message);
+          input.select(); btn.disabled = false; btn.textContent = 'submit'; break;
+        default:
+          showResult('error', '⚠ ' + (data.message || 'Unexpected error.'));
+          btn.disabled = false; btn.textContent = 'submit';
+      }
+    } catch (err) {
+      showResult('error', '⚠ Network error — please try again.');
+      btn.disabled = false; btn.textContent = 'submit';
+    }
+  });
+
+  function showResult(type, msg) {
+    resultBox.textContent = msg;
+    resultBox.className   = 'submit-result result-' + type;
+    resultBox.style.display = 'block';
+  }
+})();
+</script>
+{% endblock %}

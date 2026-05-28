@@ -1,0 +1,161 @@
+services:
+
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ctfdb
+      POSTGRES_USER: ctfuser
+      POSTGRES_PASSWORD: ctfpassword123
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ctfuser -d ctfdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: gunicorn ctf.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    volumes:
+      - .:/app
+      - media_files:/app/media
+      - static_files:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=change-this-in-production-use-long-random-string
+      - DATABASE_URL=postgresql://ctfuser:ctfpassword123@db:5432/ctfdb
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - CTF_NAME=अन्वेषण CTF
+      - CTF_START=2025-01-01T00:00:00
+      - CTF_END=2025-12-31T23:59:59
+
+  celery:
+    build: .
+    command: celery -A ctf worker -l info -Q default
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=change-this-in-production-use-long-random-string
+      - DATABASE_URL=postgresql://ctfuser:ctfpassword123@db:5432/ctfdb
+      - REDIS_URL=redis://redis:6379/0
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - static_files:/static
+      - media_files:/media
+    depends_on:
+      - web
+
+  # ── Web Challenges ──────────────────────────────────────────────────
+  challenge_web_sqli:
+    build: ./challenges/web_sqli
+    environment:
+      - FLAG=CTF{sql_1nj3ct10n_f0r_th3_w1n}
+    ports:
+      - "5000:5000"
+    mem_limit: 128m
+    cpus: '0.3'
+    restart: unless-stopped
+
+  challenge_web_session:
+    build: ./challenges/web_session_hijacking
+    environment:
+      - FLAG=CTF{s3ss10n_h1j4ck1ng_1s_d4ng3r0us}
+    ports:
+      - "5001:5001"
+    mem_limit: 128m
+    cpus: '0.3'
+    restart: unless-stopped
+
+  challenge_web_traversal:
+    build: ./challenges/web_path_traverser_hard
+    environment:
+      - FLAG=CTF{p4th_tr4v3rs4l_0ut_0f_b0unds}
+    ports:
+      - "5002:5002"
+    mem_limit: 128m
+    cpus: '0.3'
+    restart: unless-stopped
+
+  challenge_web_xss:
+    build: ./challenges/web_reflected_xss
+    environment:
+      - FLAG=CTF{r3fl3ct3d_xss_n0_s4n1t1z4t10n}
+    ports:
+      - "5003:5003"
+    mem_limit: 128m
+    cpus: '0.3'
+    restart: unless-stopped
+
+  challenge_web_ssti:
+    build: ./challenges/web_ssti
+    environment:
+      - FLAG=CTF{sst1_jinja2_rce_via_mro_chain}
+    ports:
+      - "5004:5004"
+    mem_limit: 128m
+    cpus: '0.3'
+    restart: unless-stopped
+
+  challenge_web_jwt:
+    build: ./challenges/web_jwt_trickery
+    environment:
+      - FLAG=CTF{jwt_4lg_n0n3_4nd_w34k_s3cr3t}
+    ports:
+      - "5005:5005"
+    mem_limit: 128m
+    cpus: '0.3'
+    restart: unless-stopped
+
+  # ── PWN ─────────────────────────────────────────────────────────────
+  challenge_pwn_bof:
+    build: ./challenges/pwn_bof
+    environment:
+      - FLAG=CTF{buff3r_0v3rfl0w_pwn3d}
+    ports:
+      - "4444:4444"
+    mem_limit: 128m
+    cpus: '0.3'
+    restart: unless-stopped
+
+  # ── Reverse Engineering File Server ─────────────────────────────────
+  challenge_rev_files:
+    build: ./challenges/rev_fileserver
+    ports:
+      - "5016:5016"
+    mem_limit: 128m
+    cpus: '0.3'
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_files:
+  static_files:

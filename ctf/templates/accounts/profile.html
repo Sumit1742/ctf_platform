@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}{{ player.username }} — {{ CTF_NAME }}{% endblock %}
+
+{% block content %}
+<div class="profile-header">
+  <div class="profile-avatar">
+    {% if player.avatar %}
+      <img src="{{ player.avatar.url }}" alt="{{ player.username }}">
+    {% else %}
+      {{ player.username|first|upper }}
+    {% endif %}
+  </div>
+  <div class="profile-info">
+    <h1>~/{{ player.username }}</h1>
+    <div class="profile-meta">
+      {% if player.affiliation %}<span>{{ player.affiliation }}</span>{% endif %}
+      {% if player.country %}<span>{{ player.country }}</span>{% endif %}
+      {% if player.website %}<span><a href="{{ player.website }}" style="color:var(--cyan)">{{ player.website }}</a></span>{% endif %}
+    </div>
+    {% if player.bio %}
+    <p style="margin-top:0.75rem;color:var(--text-dim);font-size:0.95rem;max-width:500px">{{ player.bio }}</p>
+    {% endif %}
+    {% if is_own %}
+    <a href="{% url 'accounts:edit_profile' %}" class="btn btn-outline" style="margin-top:1rem;font-size:0.85rem">edit profile</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="profile-stats">
+  <div class="stat-card">
+    <span class="stat-value">{{ player.score }}</span>
+    <span class="stat-label">total score</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-value" style="color:var(--cyan)">#{{ player.rank }}</span>
+    <span class="stat-label">rank</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-value" style="color:var(--amber)">{{ player.solves_count }}</span>
+    <span class="stat-label">solves</span>
+  </div>
+</div>
+
+{% if solves %}
+<div class="section-title">// solved challenges</div>
+<div class="card" style="padding:0;overflow:hidden">
+  <table class="solves-table">
+    <thead>
+      <tr>
+        <th>challenge</th>
+        <th>category</th>
+        <th>points</th>
+        <th>solved at</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in solves %}
+      <tr>
+        <td><a href="{% url 'challenges:detail' s.challenge.pk %}">{{ s.challenge.title }}</a></td>
+        <td style="color:{{ s.challenge.color }}">{{ s.challenge.get_category_display }}</td>
+        <td style="color:var(--amber)">+{{ s.challenge.points }}</td>
+        <td>{{ s.submitted_at|date:"M d, H:i" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:3rem;font-family:var(--mono);color:var(--text-muted)">
+  // no solves yet
+</div>
+{% endif %}
+{% endblock %}
